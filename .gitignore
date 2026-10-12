@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+.data
+.DS_Store
+CLAUDE.md
+PROGRESS.md
+SPEC.md
+DEPLOY.md
+docs/EXPLAIN.md
