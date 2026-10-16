@@ -20,6 +20,7 @@ In a rehearsal or a gig, each musician keeps their own chart, scrolls it by hand
 
 - One login for everything: a logged-in host gets host controls in their own sessions and stays logged in when joining someone else's. Members need no account. Your sessions lists the sessions you host and the ones you joined (24 hours), with Rejoin.
 - Song editor with a tap-to-edit bar grid, any number of chords per bar (chips with length, move and remove, or `Am*2 G F` as text), a chord palette for the song's key, loop fill, paste lyrics, a structure builder and templates. The chart text format (one bar per line, `C G / lyric`, `# Chorus bpm=100 ts=3`) is still there under "Edit as text". Select a bar to add a stage note for some instruments.
+- Record mode in the song editor: play a MIDI keyboard (Chrome or Edge) or the on-screen keyboard, hear a sampled piano at once, record with a count-in and click, and get the chord sheet from your playing. Notes are quantized one by one like Logic (1/4, 1/8, 1/16, triplets or auto, with strength and length snap, and you can change it again later). Chords are found at their true beat, with slash chords from the bass, and shown in a preview before Apply writes and saves them. Play back the take, see the chord you hold, and learn any key or button for Record, Stop, Play and Undo.
 - Library with search, sort by recently edited and duplicate. Unsaved song changes are guarded and kept as a draft.
 - Setlists with per-song transpose, tempo %, count-in, gap mode (countdown, immediate, manual), gap seconds, a running time and Start session, which opens the lobby (big code, copy link, who joined, Start).
 - Sessions with a join code, optional password (bcrypt, 5 wrong tries per 10 minutes), participant limit, lock, late join switch, controller policy, kick.
@@ -55,7 +56,8 @@ Step by step for MongoDB Atlas and Render in [DEPLOY.md](DEPLOY.md). In short: a
 
 ## Honest limits
 
-- No audio chord detection: charts are typed by musicians.
+- No audio chord detection: charts are typed, or played in on a MIDI or on-screen keyboard in record mode. Record mode keeps one tempo and time signature per take, and its chord detection is a heuristic that has not been tested on real players yet.
+- Web MIDI works in Chrome and Edge only. Safari and Firefox get the on-screen keyboard.
 - Lyrics are user-entered. The demo uses only public domain songs.
 - Sync accuracy is not claimed. Measure it with the debug overlay on two real devices.
 - One server instance: rooms and presence live in memory.
