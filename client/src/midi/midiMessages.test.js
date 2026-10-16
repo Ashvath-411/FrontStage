@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isSustainMessage, noteName, parseMidiMessage, pedalIsDown, pitchClass } from './midiMessages.js';
+import { bindingFromMessage, boundAction, describeBinding, isSustainMessage, noteName, parseMidiMessage, pedalIsDown, pitchClass, readBindings } from './midiMessages.js';
 
 describe('parseMidiMessage', () => {
   it('reads note on with channel and velocity', () => {
@@ -36,5 +36,41 @@ describe('note names', () => {
     expect(noteName(69)).toBe('A4');
     expect(noteName(21)).toBe('A0');
     expect(pitchClass(61)).toBe(1);
+  });
+});
+
+describe('MIDI learn', () => {
+  const note = parseMidiMessage([0x90, 36, 100]);
+  const button = parseMidiMessage([0xb1, 20, 127]);
+
+  it('turns a key, button or program change into a binding', () => {
+    expect(bindingFromMessage(note)).toEqual({ type: 'note', channel: 1, number: 36 });
+    expect(bindingFromMessage(button)).toEqual({ type: 'control', channel: 2, number: 20 });
+    expect(bindingFromMessage(parseMidiMessage([0xc0, 4]))).toEqual({ type: 'program', channel: 1, number: 4 });
+  });
+
+  it('does not learn button releases, the sustain pedal or note offs', () => {
+    expect(bindingFromMessage(parseMidiMessage([0xb1, 20, 0]))).toBe(null);
+    expect(bindingFromMessage(parseMidiMessage([0xb0, 64, 127]))).toBe(null);
+    expect(bindingFromMessage(parseMidiMessage([0x80, 36, 0]))).toBe(null);
+  });
+
+  it('finds the bound action and fires only on press', () => {
+    const bindings = { record: bindingFromMessage(note), stop: bindingFromMessage(button) };
+    expect(boundAction(bindings, note)).toEqual({ action: 'record', pressed: true });
+    expect(boundAction(bindings, parseMidiMessage([0x80, 36, 0]))).toEqual({ action: 'record', pressed: false });
+    expect(boundAction(bindings, button)).toEqual({ action: 'stop', pressed: true });
+    expect(boundAction(bindings, parseMidiMessage([0xb1, 20, 0]))).toEqual({ action: 'stop', pressed: false });
+    expect(boundAction(bindings, parseMidiMessage([0xb0, 20, 127]))).toBe(null);
+    expect(boundAction(bindings, parseMidiMessage([0x90, 37, 100]))).toBe(null);
+  });
+
+  it('describes bindings and survives broken saved data', () => {
+    expect(describeBinding(bindingFromMessage(note))).toBe('Key C2 · channel 1');
+    expect(describeBinding(bindingFromMessage(button))).toBe('Control 20 · channel 2');
+    expect(describeBinding(undefined)).toBe('Not set');
+    expect(readBindings('{"play":{"type":"note","channel":1,"number":40},"jump":{"type":"note"}}')).toEqual({ play: { type: 'note', channel: 1, number: 40 } });
+    expect(readBindings('not json')).toEqual({});
+    expect(readBindings(null)).toEqual({});
   });
 });

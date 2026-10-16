@@ -99,7 +99,7 @@ function SongEditor({ id }) {
       <div className="mb-8">
         {recordOpen && !textMode.isText ? (
           <Suspense fallback={<LoadingRows label="Opening record mode" rows={2} />}>
-            <RecordPanel editor={editor} startBar={selection.barIdx} onApply={applyRecording} onClose={() => setRecordOpen(false)} />
+            <RecordPanel editor={editor} startBar={selection.barIdx} onApply={applyRecording} onUndo={editor.undo} onClose={() => setRecordOpen(false)} />
           </Suspense>
         ) : (
           <button type="button" className="pill pill-primary" disabled={textMode.isText} onClick={() => setRecordOpen(true)}>

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMidiInput } from '../../hooks/useMidiInput.js';
+import { useMidiLearn } from '../../hooks/useMidiLearn.js';
 import { useRecordMode } from '../../hooks/useRecordMode.js';
 import { MidiDevicePanel } from './MidiDevicePanel.jsx';
 import { TakeReview } from './TakeReview.jsx';
@@ -57,9 +58,14 @@ function RecordSettings({ settings, onChange, barCount, tempo, disabled }) {
   );
 }
 
-export function RecordPanel({ editor, startBar, onApply, onClose }) {
+export function RecordPanel({ editor, startBar, onApply, onUndo, onClose }) {
   const record = useRecordMode();
-  const midi = useMidiInput(record.handleMidi);
+  const [lastDevice, setLastDevice] = useState(null);
+  const learn = useMidiLearn((action) => runAction(action));
+  const midi = useMidiInput((message, source) => {
+    if (source.deviceName !== lastDevice) setLastDevice(source.deviceName);
+    if (!learn.handle(message, source.deviceName)) record.handleMidi(message, source);
+  });
   const [firstPitch, setFirstPitch] = useState(60);
   const barCount = Math.max(1, totalBarCount(editor.sections));
   const [settings, setSettings] = useState({ startBar: Math.min(startBar ?? 0, barCount - 1), countInBars: 1, clickOn: true });
@@ -69,6 +75,18 @@ export function RecordPanel({ editor, startBar, onApply, onClose }) {
   const preview = quantized && writeTakeToChart(editor.sections, settings.startBar, chordsByBar(extractChords(quantized.notes, spelling), quantized.barCount, quantized.beatsPerBar), editor.defaults.beatsPerBar);
   const tempo = tempoAtBar(editor, settings.startBar);
   const busy = record.mode !== 'idle';
+  const startRecording = () => record.record({ ...tempo, countInBars: settings.countInBars, clickOn: settings.clickOn });
+
+  function runAction(action) {
+    if (action === 'record' && !busy) startRecording();
+    if (action === 'stop' && busy) record.stop();
+    if (action === 'play' && !busy && quantized) record.play(quantized, settings.clickOn);
+    if (action === 'undo' && !busy) {
+      if (record.take) record.setTake(null);
+      else onUndo();
+    }
+  }
+
   const heldPitches = [...record.held].sort((first, second) => first - second);
   const heldChord = nameNotes(heldPitches.map((pitch) => ({ pitch })), spelling);
 
@@ -79,7 +97,7 @@ export function RecordPanel({ editor, startBar, onApply, onClose }) {
         <button type="button" className="pill pill-small" onClick={onClose}>Close</button>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" className="pill pill-primary" disabled={busy} onClick={() => record.record({ ...tempo, countInBars: settings.countInBars, clickOn: settings.clickOn })}>
+        <button type="button" className="pill pill-primary" disabled={busy} onClick={startRecording}>
           <span aria-hidden="true" className="h-3 w-3 rounded-full bg-alert" />Record
         </button>
         <button type="button" className="pill pill-secondary" disabled={busy || !quantized} onClick={() => record.play(quantized, settings.clickOn)}>Play take</button>
@@ -106,7 +124,7 @@ export function RecordPanel({ editor, startBar, onApply, onClose }) {
       </div>
       <PianoKeyboard firstPitch={firstPitch} onFirstPitchChange={setFirstPitch} held={record.held} onNoteOn={record.noteOn} onNoteOff={record.noteOff} />
       <RecordSettings settings={settings} onChange={setSettings} barCount={barCount} tempo={tempo} disabled={busy} />
-      <MidiDevicePanel midi={midi} />
+      <MidiDevicePanel midi={midi} learn={learn} learnDevice={midi.selectedName ?? lastDevice ?? midi.devices[0]?.name} />
       <p className="text-label text-muted">Piano: Salamander Grand Piano by Alexander Holm, CC BY 3.0.</p>
     </section>
   );
