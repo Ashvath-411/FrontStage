@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSongEditor } from '../hooks/useSongEditor.js';
 import { useChartTextMode } from '../hooks/useChartTextMode.js';
@@ -21,6 +21,8 @@ import { useSongDraftGuard } from '../hooks/useSongDraftGuard.js';
 import { SaveBar } from '../components/editor/SaveBar.jsx';
 import { DraftPrompt } from '../components/editor/DraftPrompt.jsx';
 
+const RecordPanel = lazy(() => import('../components/record/RecordPanel.jsx').then((module) => ({ default: module.RecordPanel })));
+
 export function SongEditorPage() {
   const { id } = useParams();
   return <SongEditor key={id} id={id} />;
@@ -37,6 +39,7 @@ function SongEditor({ id }) {
   const confirm = useConfirm();
   const guard = useSongDraftGuard(editor, id, confirm);
   const [saving, setSaving] = useState(false);
+  const [recordOpen, setRecordOpen] = useState(false);
 
   function pickChord({ barIdx, bar, beatsPerBar, barCount }, chord, shiftKey) {
     const { chipIdx } = selection;
@@ -83,6 +86,17 @@ function SongEditor({ id }) {
       <DraftPrompt draft={guard.pendingDraft} onRestore={guard.restoreDraft} onDiscard={guard.discardDraft} />
       <div className="mb-6 min-h-6">
         <ErrorText error={editor.error} />
+      </div>
+      <div className="mb-8">
+        {recordOpen && !textMode.isText ? (
+          <Suspense fallback={<LoadingRows label="Opening record mode" rows={2} />}>
+            <RecordPanel onClose={() => setRecordOpen(false)} />
+          </Suspense>
+        ) : (
+          <button type="button" className="pill pill-primary" disabled={textMode.isText} onClick={() => setRecordOpen(true)}>
+            Record from a keyboard
+          </button>
+        )}
       </div>
       <div className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         <div className="flex flex-col gap-6">
