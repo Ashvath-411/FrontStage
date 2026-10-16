@@ -64,3 +64,7 @@ Step by step for MongoDB Atlas and Render in [DEPLOY.md](DEPLOY.md). In short: a
 ## Fonts
 
 Accent text uses Insidia if you place `insidia.woff2` (or `.woff`, `.otf`, `.ttf`) in `client/public/fonts/` and rebuild. Without it the app uses Unbounded from Google Fonts. Chords and numbers use Barlow Condensed, everything else IBM Plex Sans.
+
+## Piano sound
+
+Record mode plays the Salamander Grand Piano V3 by Alexander Holm, licensed under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), in the MP3 form published with Tone.js. The 29 samples live in `client/public/piano/` and load only when record mode opens. See `client/public/piano/CREDITS.txt`.
