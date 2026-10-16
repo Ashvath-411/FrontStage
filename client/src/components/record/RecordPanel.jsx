@@ -4,12 +4,12 @@ import { useRecordMode } from '../../hooks/useRecordMode.js';
 import { MidiDevicePanel } from './MidiDevicePanel.jsx';
 import { TakeReview } from './TakeReview.jsx';
 import { defaultQuantize, quantizeTake } from '../../midi/quantize.js';
+import { chordsByBar, extractChords, writeTakeToChart } from '../../midi/chordExtraction.js';
 import { PianoKeyboard } from './PianoKeyboard.jsx';
 import { Toggle } from '../ui/Toggle.jsx';
 import { LabeledField } from '../ui/LabeledField.jsx';
 import { noteName } from '../../midi/midiMessages.js';
-import { nameNotes } from '../../midi/chordNaming.js';
-import { spellsWithFlats } from '../../engine/chordPalette.js';
+import { keySpelling, nameNotes } from '../../midi/chordNaming.js';
 import { resolveSections } from '../../engine/songTiming.js';
 import { totalBarCount } from '../../engine/chartEdits.js';
 
@@ -36,7 +36,7 @@ function statusText(record) {
 function RecordSettings({ settings, onChange, barCount, tempo, disabled }) {
   return (
     <div className="grid gap-3 sm:grid-cols-3">
-      <LabeledField label="Start at bar">
+      <LabeledField label="Write chords from bar">
         <select className="field tabular" disabled={disabled} value={settings.startBar} onChange={(event) => onChange({ ...settings, startBar: Number(event.target.value) })}>
           {Array.from({ length: barCount }, (_, barIdx) => <option key={barIdx} value={barIdx}>{barIdx + 1}</option>)}
         </select>
@@ -56,7 +56,7 @@ function RecordSettings({ settings, onChange, barCount, tempo, disabled }) {
   );
 }
 
-export function RecordPanel({ editor, startBar, onClose }) {
+export function RecordPanel({ editor, startBar, onApply, onClose }) {
   const record = useRecordMode();
   const midi = useMidiInput(record.handleMidi);
   const [firstPitch, setFirstPitch] = useState(60);
@@ -64,10 +64,12 @@ export function RecordPanel({ editor, startBar, onClose }) {
   const [settings, setSettings] = useState({ startBar: Math.min(startBar ?? 0, barCount - 1), countInBars: 1, clickOn: true });
   const [quantize, setQuantize] = useState(defaultQuantize);
   const quantized = useMemo(() => (record.take ? quantizeTake(record.take, quantize) : null), [record.take, quantize]);
+  const spelling = keySpelling(editor.meta.keyRoot, editor.meta.keyMode);
+  const preview = quantized && writeTakeToChart(editor.sections, settings.startBar, chordsByBar(extractChords(quantized.notes, spelling), quantized.barCount, quantized.beatsPerBar), editor.defaults.beatsPerBar);
   const tempo = tempoAtBar(editor, settings.startBar);
   const busy = record.mode !== 'idle';
   const heldPitches = [...record.held].sort((first, second) => first - second);
-  const heldChord = nameNotes(heldPitches.map((pitch) => ({ pitch })), spellsWithFlats(editor.meta.keyRoot, editor.meta.keyMode));
+  const heldChord = nameNotes(heldPitches.map((pitch) => ({ pitch })), spelling);
 
   return (
     <section aria-label="Record" className="flex flex-col gap-4 rounded-[4px] border border-line bg-surface p-4">
@@ -82,7 +84,19 @@ export function RecordPanel({ editor, startBar, onClose }) {
         <button type="button" className="pill pill-secondary" disabled={!busy} onClick={record.stop}>Stop</button>
         <p role="status" className={`tabular font-semibold ${record.mode === 'recording' ? 'text-alert' : 'text-text'}`}>{statusText(record)}</p>
       </div>
-      {quantized && !busy && <TakeReview quantized={quantized} quantize={quantize} onQuantizeChange={setQuantize} onDiscard={() => record.setTake(null)} />}
+      {quantized && !busy && (
+        <TakeReview
+          quantized={quantized}
+          quantize={quantize}
+          onQuantizeChange={setQuantize}
+          preview={preview}
+          onApply={() => {
+            onApply(preview.sections, preview.changes);
+            record.setTake(null);
+          }}
+          onCancel={() => record.setTake(null)}
+        />
+      )}
       <p className="text-label text-muted">{soundText(record.sound)}{record.pedal ? ' · Pedal down' : ''}</p>
       <div className="flex min-h-20 items-baseline gap-4">
         <p aria-live="polite" aria-label={heldChord ? `Chord ${heldChord}` : 'No chord'} className="font-chord text-5xl font-semibold text-cyan">{heldChord ?? '–'}</p>

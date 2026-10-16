@@ -49,17 +49,26 @@ function SongEditor({ id }) {
     if (result.advance && barIdx + 1 < barCount) setSelection({ barIdx: barIdx + 1, focusChord: false, chipIdx: null });
   }
 
+  async function saveSections(sections, savedMessage = 'Song saved') {
+    setSaving(true);
+    const saved = await editor.save(sections);
+    setSaving(false);
+    showToast(saved ? savedMessage : 'Song not saved. See the message above.', saved ? 'info' : 'error');
+    if (!saved) return;
+    guard.markSaved(saved._id, sections);
+    if (editor.isNew) navigate(`/songs/${saved._id}`, { replace: true });
+  }
+
   async function save() {
     const chart = textMode.readDraft();
     if (chart.error) return;
     if (textMode.isText) textMode.closeText();
-    setSaving(true);
-    const saved = await editor.save(chart.sections);
-    setSaving(false);
-    showToast(saved ? 'Song saved' : 'Song not saved. See the message above.', saved ? 'info' : 'error');
-    if (!saved) return;
-    guard.markSaved(saved._id, chart.sections);
-    if (editor.isNew) navigate(`/songs/${saved._id}`, { replace: true });
+    await saveSections(chart.sections);
+  }
+
+  async function applyRecording(sections, changes) {
+    editor.replaceChart(sections);
+    await saveSections(sections, `Chords written to bars ${changes[0].barIdx + 1} to ${changes.at(-1).barIdx + 1} and saved`);
   }
 
   async function remove() {
@@ -90,7 +99,7 @@ function SongEditor({ id }) {
       <div className="mb-8">
         {recordOpen && !textMode.isText ? (
           <Suspense fallback={<LoadingRows label="Opening record mode" rows={2} />}>
-            <RecordPanel editor={editor} startBar={selection.barIdx} onClose={() => setRecordOpen(false)} />
+            <RecordPanel editor={editor} startBar={selection.barIdx} onApply={applyRecording} onClose={() => setRecordOpen(false)} />
           </Suspense>
         ) : (
           <button type="button" className="pill pill-primary" disabled={textMode.isText} onClick={() => setRecordOpen(true)}>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nameNotes, pitchClassWeights } from './chordNaming.js';
+import { keySpelling, nameNotes, pitchClassWeights, spellPitchClass } from './chordNaming.js';
 
 const held = (...pitches) => pitches.map((pitch) => ({ pitch }));
 
@@ -26,7 +26,7 @@ describe('nameNotes', () => {
     expect(nameNotes(held(52, 60, 67))).toBe('C/E');
     expect(nameNotes(held(43, 60, 64))).toBe('C/G');
     expect(nameNotes(held(54, 62, 69))).toBe('D/F#');
-    expect(nameNotes(held(46, 60, 64, 67))).toBe('C7/A#');
+    expect(nameNotes(held(46, 60, 64, 67))).toBe('C7/Bb');
   });
 
   it('copes with spread voicings and missing fifths', () => {
@@ -37,10 +37,16 @@ describe('nameNotes', () => {
     expect(nameNotes(held(40, 47))).toBe('E5');
   });
 
-  it('spells with flats in flat keys', () => {
-    expect(nameNotes(held(58, 62, 65), true)).toBe('Bb');
-    expect(nameNotes(held(58, 62, 65), false)).toBe('A#');
-    expect(nameNotes(held(51, 55, 58, 61), true)).toBe('Eb7');
+  it('spells roots from the song key', () => {
+    expect(nameNotes(held(58, 62, 65), keySpelling('F', 'major'))).toBe('Bb');
+    expect(nameNotes(held(58, 62, 65), keySpelling('C', 'major'))).toBe('Bb');
+    expect(nameNotes(held(58, 62, 65), keySpelling('E', 'major'))).toBe('A#');
+    expect(nameNotes(held(51, 55, 58, 61), keySpelling('Ab', 'major'))).toBe('Eb7');
+    expect(nameNotes(held(54, 62, 69), keySpelling('G', 'major'))).toBe('D/F#');
+    expect(nameNotes(held(56, 59, 63), keySpelling('E', 'major'))).toBe('G#m');
+    expect(spellPitchClass(8, keySpelling('C', 'major'))).toBe('Ab');
+    expect(spellPitchClass(6, keySpelling('C', 'major'))).toBe('F#');
+    expect(keySpelling('Db', 'major')).toEqual({ keyPc: 1, preferFlats: true });
   });
 
   it('needs at least two different notes', () => {

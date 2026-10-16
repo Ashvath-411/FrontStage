@@ -1,4 +1,5 @@
 import { flatNames, sharpNames } from '../engine/transpose.js';
+import { spellsWithFlats } from '../engine/chordPalette.js';
 
 const chordShapes = [
   { quality: '', tones: [0, 4, 7] },
@@ -64,15 +65,27 @@ export function bestChord(weights, bassPc) {
   return best;
 }
 
-export function chordName(chord, preferFlats) {
-  const names = preferFlats ? flatNames : sharpNames;
-  const bass = chord.bassPc !== null && chord.bassPc !== chord.root ? `/${names[chord.bassPc]}` : '';
-  return names[chord.root] + chord.quality + bass;
+const borrowedFlatSteps = [1, 3, 8, 10];
+export const plainSpelling = { keyPc: 0, preferFlats: false };
+
+export function keySpelling(keyRoot, keyMode) {
+  const keyPc = Math.max(sharpNames.indexOf(keyRoot), flatNames.indexOf(keyRoot), 0);
+  return { keyPc, preferFlats: spellsWithFlats(keyRoot, keyMode) };
 }
 
-export function nameNotes(notes, preferFlats = false) {
+export function spellPitchClass(pc, spelling) {
+  const stepFromKey = (pc - spelling.keyPc + 12) % 12;
+  return spelling.preferFlats || borrowedFlatSteps.includes(stepFromKey) ? flatNames[pc] : sharpNames[pc];
+}
+
+export function chordName(chord, spelling = plainSpelling) {
+  const bass = chord.bassPc !== null && chord.bassPc !== chord.root ? `/${spellPitchClass(chord.bassPc, spelling)}` : '';
+  return spellPitchClass(chord.root, spelling) + chord.quality + bass;
+}
+
+export function nameNotes(notes, spelling = plainSpelling) {
   if (notes.length === 0) return null;
   const bassPitch = Math.min(...notes.map((note) => note.pitch));
   const chord = bestChord(pitchClassWeights(notes), ((bassPitch % 12) + 12) % 12);
-  return chord ? chordName(chord, preferFlats) : null;
+  return chord ? chordName(chord, spelling) : null;
 }
