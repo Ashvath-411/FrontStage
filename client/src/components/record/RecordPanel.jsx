@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMidiInput } from '../../hooks/useMidiInput.js';
 import { useRecordMode } from '../../hooks/useRecordMode.js';
 import { MidiDevicePanel } from './MidiDevicePanel.jsx';
+import { TakeReview } from './TakeReview.jsx';
+import { defaultQuantize, quantizeTake } from '../../midi/quantize.js';
 import { PianoKeyboard } from './PianoKeyboard.jsx';
 import { Toggle } from '../ui/Toggle.jsx';
 import { LabeledField } from '../ui/LabeledField.jsx';
@@ -60,6 +62,8 @@ export function RecordPanel({ editor, startBar, onClose }) {
   const [firstPitch, setFirstPitch] = useState(60);
   const barCount = Math.max(1, totalBarCount(editor.sections));
   const [settings, setSettings] = useState({ startBar: Math.min(startBar ?? 0, barCount - 1), countInBars: 1, clickOn: true });
+  const [quantize, setQuantize] = useState(defaultQuantize);
+  const quantized = useMemo(() => (record.take ? quantizeTake(record.take, quantize) : null), [record.take, quantize]);
   const tempo = tempoAtBar(editor, settings.startBar);
   const busy = record.mode !== 'idle';
   const heldPitches = [...record.held].sort((first, second) => first - second);
@@ -78,6 +82,7 @@ export function RecordPanel({ editor, startBar, onClose }) {
         <button type="button" className="pill pill-secondary" disabled={!busy} onClick={record.stop}>Stop</button>
         <p role="status" className={`tabular font-semibold ${record.mode === 'recording' ? 'text-alert' : 'text-text'}`}>{statusText(record)}</p>
       </div>
+      {quantized && !busy && <TakeReview quantized={quantized} quantize={quantize} onQuantizeChange={setQuantize} onDiscard={() => record.setTake(null)} />}
       <p className="text-label text-muted">{soundText(record.sound)}{record.pedal ? ' · Pedal down' : ''}</p>
       <div className="flex min-h-20 items-baseline gap-4">
         <p aria-live="polite" aria-label={heldChord ? `Chord ${heldChord}` : 'No chord'} className="font-chord text-5xl font-semibold text-cyan">{heldChord ?? '–'}</p>
