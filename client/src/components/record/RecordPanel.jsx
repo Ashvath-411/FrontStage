@@ -29,6 +29,7 @@ function tempoAtBar(editor, barIdx) {
 function statusText(record) {
   if (record.mode === 'recording' && record.position?.countIn) return `Count-in ${record.position.countIn}`;
   if (record.mode === 'recording') return record.position ? `Recording · bar ${record.position.bar} beat ${record.position.beat}` : 'Recording';
+  if (record.mode === 'playing') return record.position?.bar ? `Playing · bar ${record.position.bar} beat ${record.position.beat}` : 'Playing';
   if (record.take) return `Take ready: ${record.take.barCount} bar${record.take.barCount === 1 ? '' : 's'}, ${record.take.notes.length} notes`;
   return 'Press Record. You hear a count-in, then play.';
 }
@@ -49,7 +50,7 @@ function RecordSettings({ settings, onChange, barCount, tempo, disabled }) {
         </select>
       </LabeledField>
       <div className="flex flex-col justify-end">
-        <Toggle label="Click while recording" checked={settings.clickOn} onChange={(clickOn) => onChange({ ...settings, clickOn })} />
+        <Toggle label="Click" checked={settings.clickOn} onChange={(clickOn) => onChange({ ...settings, clickOn })} />
       </div>
       <p className="tabular text-label text-muted sm:col-span-3">{tempo.bpm} BPM · {tempo.beatsPerBar} beats per bar. Change them in the song details.</p>
     </div>
@@ -81,10 +82,11 @@ export function RecordPanel({ editor, startBar, onApply, onClose }) {
         <button type="button" className="pill pill-primary" disabled={busy} onClick={() => record.record({ ...tempo, countInBars: settings.countInBars, clickOn: settings.clickOn })}>
           <span aria-hidden="true" className="h-3 w-3 rounded-full bg-alert" />Record
         </button>
+        <button type="button" className="pill pill-secondary" disabled={busy || !quantized} onClick={() => record.play(quantized, settings.clickOn)}>Play take</button>
         <button type="button" className="pill pill-secondary" disabled={!busy} onClick={record.stop}>Stop</button>
         <p role="status" className={`tabular font-semibold ${record.mode === 'recording' ? 'text-alert' : 'text-text'}`}>{statusText(record)}</p>
       </div>
-      {quantized && !busy && (
+      {quantized && record.mode !== 'recording' && (
         <TakeReview
           quantized={quantized}
           quantize={quantize}

@@ -93,5 +93,23 @@ export function useRecordMode() {
     setMode('idle');
   }
 
-  return { held, pedal, sound, mode, position, take, setTake, noteOn, noteOff, handleMidi, record, stop };
+  async function play(playable, clickOn) {
+    if (!transportRef.current || !playable) return;
+    await wake();
+    const context = contextRef.current;
+    const beatZero = context.currentTime + startLeadSeconds;
+    clockRef.current = { beatZero, beatSeconds: beatSeconds(playable.bpm), beatsPerBar: playable.beatsPerBar };
+    transportRef.current.start({
+      beatZero,
+      beatSeconds: beatSeconds(playable.bpm),
+      fromBeat: 0,
+      endBeat: playable.barCount * playable.beatsPerBar,
+      click: { countInBeats: 0, beatsPerBar: playable.beatsPerBar, clickOn },
+      take: playable,
+      onEnd: () => setMode('idle')
+    });
+    setMode('playing');
+  }
+
+  return { held, pedal, sound, mode, position, take, setTake, noteOn, noteOff, handleMidi, record, stop, play };
 }
