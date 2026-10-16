@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { createPiano } from '../midi/piano.js';
+import { heardTime, usePianoSound } from './usePianoSound.js';
 import { isSustainMessage, pedalIsDown } from '../midi/midiMessages.js';
+import { beatSeconds, finishTake, positionLabel, startTake, takeNoteOff, takeNoteOn, takePedal } from '../midi/recorder.js';
+
+const startLeadSeconds = 0.15;
 
 function withPitch(held, pitch, isDown) {
   const next = new Set(held);
@@ -9,68 +12,86 @@ function withPitch(held, pitch, isDown) {
   return next;
 }
 
-function audioContextClass() {
-  return window.AudioContext ?? window.webkitAudioContext ?? null;
-}
-
-function usePianoSound() {
-  const contextRef = useRef(null);
-  const pianoRef = useRef(null);
-  const [sound, setSound] = useState({ state: 'loading', loaded: 0, failed: 0, total: 0 });
-
+function usePosition(mode, getBeat, beatsPerBar) {
+  const [position, setPosition] = useState(null);
   useEffect(() => {
-    const AudioContextClass = audioContextClass();
-    if (!AudioContextClass) {
-      setSound((current) => ({ ...current, state: 'unsupported' }));
+    if (mode === 'idle') {
+      setPosition(null);
       return undefined;
     }
-    const context = new AudioContextClass({ latencyHint: 'interactive' });
-    const piano = createPiano(context);
-    contextRef.current = context;
-    pianoRef.current = piano;
-    let open = true;
-    piano.load((progress) => open && setSound({ state: 'loading', ...progress }))
-      .then((result) => open && setSound({ ...result, state: result.loaded === 0 ? 'failed' : 'ready' }));
-    return () => {
-      open = false;
-      piano.allNotesOff();
-      context.close();
-    };
-  }, []);
-
-  function wake() {
-    if (contextRef.current?.state === 'suspended') contextRef.current.resume();
-  }
-
-  return { contextRef, pianoRef, sound, wake };
+    let frame = requestAnimationFrame(function update() {
+      const next = positionLabel(getBeat(), beatsPerBar);
+      setPosition((current) => (JSON.stringify(current) === JSON.stringify(next) ? current : next));
+      frame = requestAnimationFrame(update);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [mode, beatsPerBar]);
+  return position;
 }
 
 export function useRecordMode() {
+  const { contextRef, pianoRef, transportRef, sound, wake } = usePianoSound();
   const [held, setHeld] = useState(() => new Set());
   const [pedal, setPedal] = useState(false);
-  const { pianoRef, sound, wake, contextRef } = usePianoSound();
+  const [mode, setMode] = useState('idle');
+  const [take, setTake] = useState(null);
+  const recordingRef = useRef(null);
+  const clockRef = useRef(null);
+  const position = usePosition(mode, () => {
+    const clock = clockRef.current;
+    return clock ? (heardTime(contextRef.current, performance.now()) - clock.beatZero) / clock.beatSeconds : 0;
+  }, clockRef.current?.beatsPerBar ?? 4);
 
-  function noteOn(pitch, velocity) {
+  function recordEvent(change, timeStamp) {
+    if (!recordingRef.current) return;
+    recordingRef.current = change(recordingRef.current, heardTime(contextRef.current, timeStamp ?? performance.now()));
+  }
+
+  function noteOn(pitch, velocity, timeStamp) {
     wake();
     pianoRef.current?.noteOn(pitch, velocity);
+    recordEvent((current, time) => takeNoteOn(current, pitch, velocity, time), timeStamp);
     setHeld((current) => withPitch(current, pitch, true));
   }
 
-  function noteOff(pitch) {
+  function noteOff(pitch, timeStamp) {
     pianoRef.current?.noteOff(pitch);
+    recordEvent((current, time) => takeNoteOff(current, pitch, time), timeStamp);
     setHeld((current) => withPitch(current, pitch, false));
   }
 
-  function pedalChange(down) {
+  function pedalChange(down, timeStamp) {
     pianoRef.current?.setPedal(down);
+    recordEvent((current, time) => takePedal(current, down, time), timeStamp);
     setPedal(down);
   }
 
-  function handleMidi(message) {
-    if (message.kind === 'noteOn') noteOn(message.note, message.velocity);
-    if (message.kind === 'noteOff') noteOff(message.note);
-    if (isSustainMessage(message)) pedalChange(pedalIsDown(message.value));
+  function handleMidi(message, { timeStamp } = {}) {
+    if (message.kind === 'noteOn') noteOn(message.note, message.velocity, timeStamp);
+    if (message.kind === 'noteOff') noteOff(message.note, timeStamp);
+    if (isSustainMessage(message)) pedalChange(pedalIsDown(message.value), timeStamp);
   }
 
-  return { held, pedal, sound, contextRef, noteOn, noteOff, handleMidi };
+  async function record({ bpm, beatsPerBar, countInBars, clickOn }) {
+    if (!transportRef.current) return;
+    await wake();
+    const context = contextRef.current;
+    const started = startTake({ bpm, beatsPerBar, countInBars, startTime: context.currentTime + startLeadSeconds });
+    recordingRef.current = started;
+    clockRef.current = { beatZero: started.beatZero, beatSeconds: beatSeconds(bpm), beatsPerBar };
+    transportRef.current.start({ beatZero: started.beatZero, beatSeconds: beatSeconds(bpm), fromBeat: -started.countInBeats, endBeat: Infinity, click: { countInBeats: started.countInBeats, beatsPerBar, clickOn } });
+    setMode('recording');
+  }
+
+  function stop() {
+    transportRef.current?.stop();
+    if (recordingRef.current) {
+      const finished = finishTake(recordingRef.current, heardTime(contextRef.current, performance.now()));
+      recordingRef.current = null;
+      setTake(finished.notes.length > 0 ? finished : null);
+    }
+    setMode('idle');
+  }
+
+  return { held, pedal, sound, mode, position, take, setTake, noteOn, noteOff, handleMidi, record, stop };
 }
