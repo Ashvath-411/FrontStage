@@ -62,13 +62,20 @@ export function PianoKeyboard({ firstPitch, onFirstPitchChange, held, onNoteOn, 
       typed.current.delete(event.key);
       handlers.current.onNoteOff(pitch, event.timeStamp);
     }
+    function releaseAll() {
+      typed.current.forEach((pitch) => handlers.current.onNoteOff(pitch, performance.now()));
+      typed.current.clear();
+      pointers.current.forEach((pitch) => pitch !== null && handlers.current.onNoteOff(pitch, performance.now()));
+      pointers.current.clear();
+    }
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
+    window.addEventListener('blur', releaseAll);
     return () => {
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
-      typed.current.forEach((pitch) => handlers.current.onNoteOff(pitch, performance.now()));
-      typed.current.clear();
+      window.removeEventListener('blur', releaseAll);
+      releaseAll();
     };
   }, []);
 

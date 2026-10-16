@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useConfirm } from '../../hooks/useConfirm.jsx';
 import { useMidiInput } from '../../hooks/useMidiInput.js';
 import { useMidiLearn } from '../../hooks/useMidiLearn.js';
 import { useRecordMode } from '../../hooks/useRecordMode.js';
@@ -31,6 +32,7 @@ function statusText(record) {
   if (record.mode === 'recording' && record.position?.countIn) return `Count-in ${record.position.countIn}`;
   if (record.mode === 'recording') return record.position ? `Recording · bar ${record.position.bar} beat ${record.position.beat}` : 'Recording';
   if (record.mode === 'playing') return record.position?.bar ? `Playing · bar ${record.position.bar} beat ${record.position.beat}` : 'Playing';
+  if (record.nothingRecorded) return 'Nothing was recorded. Play after the count-in, then press Stop.';
   if (record.take) return `Take ready: ${record.take.barCount} bar${record.take.barCount === 1 ? '' : 's'}, ${record.take.notes.length} notes`;
   return 'Press Record. You hear a count-in, then play.';
 }
@@ -75,10 +77,24 @@ export function RecordPanel({ editor, startBar, onApply, onUndo, onClose }) {
   const preview = quantized && writeTakeToChart(editor.sections, settings.startBar, chordsByBar(extractChords(quantized.notes, spelling), quantized.barCount, quantized.beatsPerBar), editor.defaults.beatsPerBar);
   const tempo = tempoAtBar(editor, settings.startBar);
   const busy = record.mode !== 'idle';
+  const confirm = useConfirm();
+  const recordButtonRef = useRef(null);
+  const stopButtonRef = useRef(null);
+  const canRecord = record.sound.state !== 'unsupported';
+
+  useEffect(() => {
+    (busy ? stopButtonRef : recordButtonRef).current?.focus();
+  }, [busy]);
+
+  async function close() {
+    if (record.take && !(await confirm.ask({ title: 'Close without applying?', text: 'Your take has not been written to the chart yet. Closing throws it away.', confirmLabel: 'Close and discard' }))) return;
+    onClose();
+  }
+
   const startRecording = () => record.record({ ...tempo, countInBars: settings.countInBars, clickOn: settings.clickOn });
 
   function runAction(action) {
-    if (action === 'record' && !busy) startRecording();
+    if (action === 'record' && !busy && canRecord) startRecording();
     if (action === 'stop' && busy) record.stop();
     if (action === 'play' && !busy && quantized) record.play(quantized, settings.clickOn);
     if (action === 'undo' && !busy) {
@@ -94,14 +110,16 @@ export function RecordPanel({ editor, startBar, onApply, onUndo, onClose }) {
     <section aria-label="Record" className="flex flex-col gap-4 rounded-[4px] border border-line bg-surface p-4">
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-accent text-xl font-extrabold">Record</h2>
-        <button type="button" className="pill pill-small" onClick={onClose}>Close</button>
+        <button type="button" className="pill pill-small" onClick={close}>Close</button>
       </div>
+      {confirm.dialog}
+      <p className="text-label text-muted">Press Record, play after the count-in, then Stop. Check the chords, then Apply.</p>
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" className="pill pill-primary" disabled={busy} onClick={startRecording}>
+        <button ref={recordButtonRef} type="button" className="pill pill-primary" disabled={busy || !canRecord} onClick={startRecording}>
           <span aria-hidden="true" className="h-3 w-3 rounded-full bg-alert" />Record
         </button>
         <button type="button" className="pill pill-secondary" disabled={busy || !quantized} onClick={() => record.play(quantized, settings.clickOn)}>Play take</button>
-        <button type="button" className="pill pill-secondary" disabled={!busy} onClick={record.stop}>Stop</button>
+        <button ref={stopButtonRef} type="button" className="pill pill-secondary" disabled={!busy} onClick={record.stop}>Stop</button>
         <p role="status" className={`tabular font-semibold ${record.mode === 'recording' ? 'text-alert' : 'text-text'}`}>{statusText(record)}</p>
       </div>
       {quantized && record.mode !== 'recording' && (

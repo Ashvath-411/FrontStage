@@ -35,6 +35,7 @@ export function useRecordMode() {
   const [pedal, setPedal] = useState(false);
   const [mode, setMode] = useState('idle');
   const [take, setTake] = useState(null);
+  const [nothingRecorded, setNothingRecorded] = useState(false);
   const recordingRef = useRef(null);
   const clockRef = useRef(null);
   const position = usePosition(mode, () => {
@@ -78,6 +79,7 @@ export function useRecordMode() {
     const context = contextRef.current;
     const started = startTake({ bpm, beatsPerBar, countInBars, startTime: context.currentTime + startLeadSeconds });
     recordingRef.current = started;
+    setNothingRecorded(false);
     clockRef.current = { beatZero: started.beatZero, beatSeconds: beatSeconds(bpm), beatsPerBar };
     transportRef.current.start({ beatZero: started.beatZero, beatSeconds: beatSeconds(bpm), fromBeat: -started.countInBeats, endBeat: Infinity, click: { countInBeats: started.countInBeats, beatsPerBar, clickOn } });
     setMode('recording');
@@ -89,6 +91,7 @@ export function useRecordMode() {
       const finished = finishTake(recordingRef.current, heardTime(contextRef.current, performance.now()));
       recordingRef.current = null;
       setTake(finished.notes.length > 0 ? finished : null);
+      setNothingRecorded(finished.notes.length === 0);
     }
     setMode('idle');
   }
@@ -111,5 +114,5 @@ export function useRecordMode() {
     setMode('playing');
   }
 
-  return { held, pedal, sound, mode, position, take, setTake, noteOn, noteOff, handleMidi, record, stop, play };
+  return { held, pedal, sound, mode, position, take, setTake, nothingRecorded, noteOn, noteOff, handleMidi, record, stop, play };
 }
