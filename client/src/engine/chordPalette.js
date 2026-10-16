@@ -4,7 +4,7 @@ import { appendChord, chordsFromWeighted, maxChordsPerBar, replaceChordAt, weigh
 const majorScaleChords = [[0, ''], [2, 'm'], [4, 'm'], [5, ''], [7, ''], [9, 'm'], [11, 'dim']];
 const minorScaleChords = [[0, 'm'], [2, 'dim'], [3, ''], [5, 'm'], [7, 'm'], [8, ''], [10, '']];
 
-function spellsWithFlats(keyRoot, keyMode) {
+export function spellsWithFlats(keyRoot, keyMode) {
   return keyRoot.includes('b') || keyPrefersFlats(keyRoot, keyMode);
 }
 
