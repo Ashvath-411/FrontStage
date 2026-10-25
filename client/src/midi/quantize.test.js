@@ -10,16 +10,18 @@ const humanize = (beats) => beats.map((beat, index) => beat + jitter[index % jit
 
 describe('snapping and clusters', () => {
   it('snaps to the nearest grid line', () => {
-    expect(snapToGrid(1.12, 0.25)).toBe(1);
-    expect(snapToGrid(1.13, 0.25)).toBe(1.25);
-    expect(snapToGrid(0.3, 1 / 3)).toBeCloseTo(1 / 3, 9);
+    expect(snapToGrid(1.12, '1/16')).toBe(1);
+    expect(snapToGrid(1.13, '1/16')).toBe(1.25);
+    expect(snapToGrid(0.3, '1/8T')).toBe(1 / 3);
+    expect(Object.is(snapToGrid(-0.3, '1/4'), 0)).toBe(true);
   });
 
   it('groups a rolled chord into one cluster but keeps fast notes apart', () => {
     const notes = [0.02, 0.06, 0.1, 0.5].map((start) => ({ start }));
     expect(clusterOnsets(notes, rolledChordWindow(120)).map((cluster) => cluster.notes.length)).toEqual([3, 1]);
-    expect(rolledChordWindow(120)).toBeCloseTo(0.15, 9);
-    expect(rolledChordWindow(60)).toBeCloseTo(0.08, 9);
+    expect(rolledChordWindow(120)).toBeCloseTo(0.1, 9);
+    expect(rolledChordWindow(60)).toBeCloseTo(0.05, 9);
+    expect(rolledChordWindow(300)).toBe(0.15);
   });
 });
 
@@ -92,11 +94,13 @@ describe('quantizeTake', () => {
     expect(JSON.stringify(take)).toBe(before);
   });
 
-  it('moves pickups to bar 1 and keeps notes inside the take', () => {
+  it('moves pickups to bar 1 and adds a bar for a note played just before the next bar line', () => {
     const take = { ...takeOf([-0.3, 15.9], { length: 1 }), pedal: [{ beat: -0.2, down: true }] };
     const result = quantizeTake(take, { grid: '1/4', strength: 100, lengthSnap: false });
     expect(result.notes[0].start).toBe(0);
-    expect(result.notes[1].end).toBe(16);
+    expect(result.barCount).toBe(5);
+    expect(result.notes[1].start).toBe(16);
+    expect(result.notes[1].end).toBe(17);
     expect(result.pedal[0].beat).toBe(0);
   });
 });

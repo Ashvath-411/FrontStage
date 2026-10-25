@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { beatAtTime, clickBeats, eventContextTime, finishTake, positionLabel, startTake, takeNoteOff, takeNoteOn, takePedal } from './recorder.js';
+import { beatAtTime, clickBeats, eventContextTime, finishTake, positionLabel, startTake, takeNoteOff, takeNoteOn, takePedal, trustedEventTime } from './recorder.js';
 
 const settings = { bpm: 120, beatsPerBar: 4, countInBars: 1, startTime: 10 };
 
@@ -15,6 +15,31 @@ describe('recorder timing', () => {
   it('maps a MIDI event time to the audio time the player heard', () => {
     expect(eventContextTime(1000, { contextTime: 5, performanceTime: 900 }, null)).toBeCloseTo(5.1, 6);
     expect(eventContextTime(1000, { contextTime: 0, performanceTime: 0 }, { currentTime: 5, latencySeconds: 0.02, nowPerfMs: 1100 })).toBeCloseTo(4.88, 6);
+  });
+});
+
+describe('time origin against the audible click', () => {
+  const take = startTake(settings);
+  const outputLatency = 0.2;
+  const clickHeardAtPerfMs = 5000 + (take.beatZero - 10) * 1000 + outputLatency * 1000;
+
+  it('a press exactly when the click is heard is beat 0, using the output timestamp', () => {
+    const stamp = { contextTime: 10, performanceTime: 5000 + outputLatency * 1000 };
+    expect(beatAtTime(take, eventContextTime(clickHeardAtPerfMs, stamp, null))).toBeCloseTo(0, 9);
+  });
+
+  it('the fallback subtracts the output latency, never adds it', () => {
+    const fallback = { currentTime: take.beatZero + outputLatency, latencySeconds: outputLatency, nowPerfMs: clickHeardAtPerfMs };
+    expect(beatAtTime(take, eventContextTime(clickHeardAtPerfMs, null, fallback))).toBeCloseTo(0, 9);
+    expect(beatAtTime(take, fallback.currentTime)).toBeCloseTo(0.4, 9);
+  });
+
+  it('ignores a missing, zero, stale or future event time stamp', () => {
+    expect(trustedEventTime(4990, 5000)).toBe(4990);
+    expect(trustedEventTime(undefined, 5000)).toBe(5000);
+    expect(trustedEventTime(0, 5000)).toBe(5000);
+    expect(trustedEventTime(3000, 5000)).toBe(5000);
+    expect(trustedEventTime(5100, 5000)).toBe(5000);
   });
 });
 

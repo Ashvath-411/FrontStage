@@ -1,6 +1,7 @@
 export const earliestNoteBeat = -1;
 const shortestNoteBeats = 0.01;
 export const stopGraceBeats = 0.5;
+export const oldestEventMs = 1000;
 
 export function beatSeconds(bpm) {
   return 60 / bpm;
@@ -9,6 +10,11 @@ export function beatSeconds(bpm) {
 export function eventContextTime(eventPerfMs, outputStamp, fallback) {
   if (outputStamp?.performanceTime > 0) return outputStamp.contextTime + (eventPerfMs - outputStamp.performanceTime) / 1000;
   return fallback.currentTime - fallback.latencySeconds - (fallback.nowPerfMs - eventPerfMs) / 1000;
+}
+
+export function trustedEventTime(timeStamp, nowPerfMs) {
+  const age = nowPerfMs - timeStamp;
+  return Number.isFinite(timeStamp) && timeStamp > 0 && age >= 0 && age <= oldestEventMs ? timeStamp : nowPerfMs;
 }
 
 export function startTake({ bpm, beatsPerBar, countInBars, startTime }) {
@@ -54,9 +60,7 @@ export function finishTake(take, time) {
   });
   const lastBeat = Math.max(stopBeat - stopGraceBeats, ...closed.notes.map((note) => note.start + shortestNoteBeats));
   const barCount = Math.max(1, Math.ceil(lastBeat / take.beatsPerBar));
-  const endBeat = barCount * take.beatsPerBar;
-  const notes = closed.notes
-    .map((note) => ({ ...note, end: Math.min(note.end, endBeat) }))
+  const notes = [...closed.notes]
     .sort((first, second) => first.start - second.start || first.pitch - second.pitch);
   return {
     bpm: take.bpm,

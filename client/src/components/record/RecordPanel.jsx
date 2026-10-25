@@ -5,7 +5,8 @@ import { useMidiLearn } from '../../hooks/useMidiLearn.js';
 import { useRecordMode } from '../../hooks/useRecordMode.js';
 import { MidiDevicePanel } from './MidiDevicePanel.jsx';
 import { TakeReview } from './TakeReview.jsx';
-import { defaultQuantize, quantizeTake } from '../../midi/quantize.js';
+import { useStoredPrefs } from '../../hooks/useStoredPrefs.js';
+import { defaultQuantize, quantizeTake, withTimingOffset } from '../../midi/quantize.js';
 import { chordsByBar, extractChords, writeTakeToChart } from '../../midi/chordExtraction.js';
 import { PianoKeyboard } from './PianoKeyboard.jsx';
 import { Toggle } from '../ui/Toggle.jsx';
@@ -35,6 +36,28 @@ function statusText(record) {
   if (record.nothingRecorded) return 'Nothing was recorded. Play after the count-in, then press Stop.';
   if (record.take) return `Take ready: ${record.take.barCount} bar${record.take.barCount === 1 ? '' : 's'}, ${record.take.notes.length} notes`;
   return 'Press Record. You hear a count-in, then play.';
+}
+
+const timingOffsetLimitMs = 500;
+
+function clampOffset(value) {
+  return Number.isFinite(value) ? Math.max(-timingOffsetLimitMs, Math.min(timingOffsetLimitMs, Math.round(value))) : 0;
+}
+
+function TimingOffsetField({ value, onChange }) {
+  const [draft, setDraft] = useState(String(value));
+  function edit(text) {
+    setDraft(text);
+    if (text.trim() !== '' && Number.isFinite(Number(text))) onChange(clampOffset(Number(text)));
+  }
+  return (
+    <div className="sm:col-span-3">
+      <LabeledField label="Timing offset (ms)">
+        <input type="number" inputMode="numeric" className="field tabular w-32" min={-timingOffsetLimitMs} max={timingOffsetLimitMs} step={5} value={draft} onChange={(event) => edit(event.target.value)} onBlur={() => setDraft(String(value))} />
+      </LabeledField>
+      <p className="mt-1 text-label text-muted">If your notes always land late (for example with Bluetooth headphones), raise this. It also changes the take you have now.</p>
+    </div>
+  );
 }
 
 function RecordSettings({ settings, onChange, barCount, tempo, disabled }) {
@@ -72,9 +95,11 @@ export function RecordPanel({ editor, startBar, onApply, onUndo, onClose }) {
   const barCount = Math.max(1, totalBarCount(editor.sections));
   const [settings, setSettings] = useState({ startBar: Math.min(startBar ?? 0, barCount - 1), countInBars: 1, clickOn: true });
   const [quantize, setQuantize] = useState(defaultQuantize);
-  const quantized = useMemo(() => (record.take ? quantizeTake(record.take, quantize) : null), [record.take, quantize]);
+  const [recordPrefs, updateRecordPrefs] = useStoredPrefs('setlist.recordPrefs', { timingOffsetMs: 0 });
+  const timingOffsetMs = clampOffset(Number(recordPrefs.timingOffsetMs));
+  const quantized = useMemo(() => (record.take ? quantizeTake(withTimingOffset(record.take, timingOffsetMs), quantize) : null), [record.take, quantize, timingOffsetMs]);
   const spelling = keySpelling(editor.meta.keyRoot, editor.meta.keyMode);
-  const preview = quantized && writeTakeToChart(editor.sections, settings.startBar, chordsByBar(extractChords(quantized.notes, spelling), quantized.barCount, quantized.beatsPerBar), editor.defaults.beatsPerBar);
+  const preview = quantized && writeTakeToChart(editor.sections, settings.startBar, chordsByBar(extractChords(quantized.chordNotes, spelling), quantized.barCount, quantized.beatsPerBar), editor.defaults.beatsPerBar);
   const tempo = tempoAtBar(editor, settings.startBar);
   const busy = record.mode !== 'idle';
   const confirm = useConfirm();
@@ -142,6 +167,7 @@ export function RecordPanel({ editor, startBar, onApply, onUndo, onClose }) {
       </div>
       <PianoKeyboard firstPitch={firstPitch} onFirstPitchChange={setFirstPitch} held={record.held} onNoteOn={record.noteOn} onNoteOff={record.noteOff} />
       <RecordSettings settings={settings} onChange={setSettings} barCount={barCount} tempo={tempo} disabled={busy} />
+      <TimingOffsetField value={timingOffsetMs} onChange={(value) => updateRecordPrefs({ timingOffsetMs: value })} />
       <MidiDevicePanel midi={midi} learn={learn} learnDevice={midi.selectedName ?? lastDevice ?? midi.devices[0]?.name} />
       <p className="text-label text-muted">Piano: Salamander Grand Piano by Alexander Holm, CC BY 3.0.</p>
     </section>

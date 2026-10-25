@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { heardTime, usePianoSound } from './usePianoSound.js';
 import { isSustainMessage, pedalIsDown } from '../midi/midiMessages.js';
-import { beatSeconds, finishTake, positionLabel, startTake, takeNoteOff, takeNoteOn, takePedal } from '../midi/recorder.js';
+import { beatSeconds, finishTake, positionLabel, startTake, takeNoteOff, takeNoteOn, takePedal, trustedEventTime } from '../midi/recorder.js';
 
 const startLeadSeconds = 0.15;
 
@@ -45,7 +45,7 @@ export function useRecordMode() {
 
   function recordEvent(change, timeStamp) {
     if (!recordingRef.current) return;
-    recordingRef.current = change(recordingRef.current, heardTime(contextRef.current, timeStamp ?? performance.now()));
+    recordingRef.current = change(recordingRef.current, heardTime(contextRef.current, trustedEventTime(timeStamp, performance.now())));
   }
 
   function noteOn(pitch, velocity, timeStamp) {

@@ -95,7 +95,18 @@ describe('from raw playing to chart text', () => {
     const take = { bpm: 100, beatsPerBar: 4, barCount: 2, notes: raw, pedal: [] };
     const quantized = quantizeTake(take);
     expect(quantized.grid).toBe('1/8');
-    const bars = chordsByBar(extractChords(quantized.notes, keySpelling('C', 'major')), 2, 4);
+    const bars = chordsByBar(extractChords(quantized.chordNotes, keySpelling('C', 'major')), 2, 4);
     expect(bars.map((bar) => formatChordTokens(bar, 4))).toEqual(['Am . G F', 'C']);
+  });
+
+  it('keeps chords on the beat at low strength and with length snap off', () => {
+    const raw = [
+      ...[45, 60, 64].map((pitch, index) => ({ pitch, velocity: 80, start: -0.06 + index * 0.02, end: 1.8 })),
+      ...[43, 59, 62].map((pitch) => ({ pitch, velocity: 85, start: 1.93, end: 3.9 })),
+      ...[41, 57, 60].map((pitch) => ({ pitch, velocity: 90, start: 4.07, end: 7.7 }))
+    ];
+    const quantized = quantizeTake({ bpm: 90, beatsPerBar: 4, barCount: 2, notes: raw, pedal: [] }, { grid: '1/4', strength: 30, lengthSnap: false });
+    const events = extractChords(quantized.chordNotes, keySpelling('C', 'major'));
+    expect(events).toEqual([{ beat: 0, chord: 'Am' }, { beat: 2, chord: 'G' }, { beat: 4, chord: 'F' }]);
   });
 });
