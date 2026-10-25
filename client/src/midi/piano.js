@@ -37,7 +37,7 @@ function fadeOut(context, voice, when, seconds) {
   voice.released = true;
 }
 
-export function createPiano(context) {
+export function createPiano(context, destination = context.destination) {
   const buffers = new Map();
   const output = context.createGain();
   const limiter = context.createDynamicsCompressor();
@@ -48,7 +48,7 @@ export function createPiano(context) {
   Object.entries(limiterSettings).forEach(([name, value]) => {
     limiter[name].value = value;
   });
-  output.connect(limiter).connect(context.destination);
+  output.connect(limiter).connect(destination);
 
   function startVoice(pitch, velocity, when) {
     const samplePitch = nearestSample(pitch, buffers.keys());
@@ -101,8 +101,8 @@ export function createPiano(context) {
     buffers.set(pitch, await context.decodeAudioData(await response.arrayBuffer()));
   }
 
-  async function load(onProgress) {
-    const files = loadOrder(sampleFiles());
+  async function load(onProgress, wanted = () => true) {
+    const files = loadOrder(sampleFiles().filter((file) => wanted(file.pitch)));
     let failed = 0;
     for (let start = 0; start < files.length; start += loadBatchSize) {
       const results = await Promise.allSettled(files.slice(start, start + loadBatchSize).map(loadOne));

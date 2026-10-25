@@ -6,6 +6,7 @@ import { usePlayhead } from '../hooks/usePlayhead.js';
 import { useViewPrefs } from '../hooks/useViewPrefs.js';
 import { useControls } from '../hooks/useControls.js';
 import { useSound } from '../hooks/useSound.js';
+import { useLivePad } from '../hooks/useLivePad.js';
 import { useJoinedSessionMemory } from '../hooks/useJoinedSessionMemory.js';
 import { useLiveNavigation } from '../hooks/useLiveNavigation.js';
 import { usePageTitle } from '../hooks/usePageTitle.js';
@@ -43,6 +44,7 @@ export function LivePage() {
   const controls = useControls(live);
   const instrument = prefs.instrument || (live.session && findMe(live.session)?.instrument) || '';
   const sound = useSound({ session: live.session, timelines, clockOffsetMs: clock.offsetMs, instrument });
+  const pad = useLivePad({ session: live.session, timelines, clockOffsetMs: clock.offsetMs, clickOffsetMs: sound.prefs.clickOffsetMs });
   const [panel, setPanel] = useState(null);
   const [knownCode] = useState(() => recentJoinedSessions().find((entry) => entry.sessionId === id)?.code ?? '');
   const [debugOn, setDebugOn] = useState(searchParams.get('debug') === '1');
@@ -80,6 +82,7 @@ export function LivePage() {
           prefs={prefs}
           updatePrefs={updatePrefs}
           sound={sound}
+          pad={pad}
           signedIn={Boolean(auth.user)}
           debugOn={debugOn}
           onToggleDebug={() => setDebugOn(!debugOn)}

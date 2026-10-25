@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useConfirm } from '../../hooks/useConfirm.jsx';
+import { PadControls } from './PadControls.jsx';
 
 function MenuButton({ children, onClick, danger }) {
   return (
@@ -26,7 +27,7 @@ function ConfirmLine({ text, confirmLabel, onConfirm, onCancel }) {
   );
 }
 
-export function LiveMenu({ session, signedIn, debugOn, onOpenPanel, onLeave, onEnd, onToggleDebug }) {
+export function LiveMenu({ session, pad, signedIn, debugOn, onOpenPanel, onLeave, onEnd, onToggleDebug }) {
   const [confirming, setConfirming] = useState(null);
   const confirm = useConfirm();
   const isHost = session.me.isHost;
@@ -36,6 +37,7 @@ export function LiveMenu({ session, signedIn, debugOn, onOpenPanel, onLeave, onE
 
   return (
     <nav aria-label="Session menu" className="flex flex-col">
+      {pad && <PadControls pad={pad} />}
       {confirming === 'leave' ? (
         <ConfirmLine text={`Leave ${session.name}? Your seat is given up.`} confirmLabel="Leave" onConfirm={onLeave} onCancel={() => setConfirming(null)} />
       ) : (

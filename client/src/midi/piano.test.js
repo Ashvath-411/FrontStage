@@ -70,4 +70,15 @@ describe('createPiano', () => {
     globalThis.fetch = async (url) => ({ ok: !url.includes('C8'), arrayBuffer: async () => new ArrayBuffer(8) });
     expect(await piano.load()).toEqual({ loaded: 28, failed: 1, total: 29 });
   });
+
+  it('loads only the wanted samples and plays into the given output', async () => {
+    const context = createTestAudioContext();
+    const connected = [];
+    const output = { connect: () => output };
+    context.createDynamicsCompressor = () => ({ threshold: {}, knee: {}, ratio: {}, attack: {}, release: {}, connect: (target) => connected.push(target) && target });
+    const piano = createPiano(context, output);
+    globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) });
+    expect(await piano.load(undefined, (pitch) => pitch >= 36 && pitch <= 69)).toEqual({ loaded: 12, failed: 0, total: 12 });
+    expect(connected).toEqual([output]);
+  });
 });
