@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildTimeline } from './timeline.js';
-import { emptyPadMemory, padChangesBetween, padChordAt, padTick, sessionElapsedMs } from './padSchedule.js';
+import { emptyPadMemory, padChangesBetween, padChordAt, padChordName, padTick, sessionElapsedMs } from './padSchedule.js';
 
 const firstSong = {
   sections: [{ bpm: 120, beatsPerBar: 4, barCount: 2 }, { bpm: 60, beatsPerBar: 3, barCount: 1 }],
@@ -110,5 +110,17 @@ describe('padTick', () => {
     expect(sessionElapsedMs({ playState: 'playing', anchorServerMs: 1000, anchorOffsetMs: 200 }, 3000)).toBe(2200);
     expect(sessionElapsedMs({ playState: 'paused', anchorServerMs: 1000, anchorOffsetMs: 200 }, 3000)).toBe(null);
     expect(sessionElapsedMs({ playState: 'ended', anchorServerMs: 1000, anchorOffsetMs: 0 }, 3000)).toBe(null);
+  });
+});
+
+describe('padChordName', () => {
+  it('names the chord being played, and clears it on release, stop and pause', () => {
+    const playing = run(emptyPadMemory, 1900, 2000);
+    expect(padChordName(playing, null)).toBe('C');
+    const quiet = padTick(playing.memory, { playing: true, key: 'a', nowMs: 2025, lookAheadMs: 150, timelines, fromItem: 0, autoAdvance: true });
+    expect(padChordName(quiet, 'C')).toBe('C');
+    expect(padChordName(padTick(playing.memory, { playing: false }), 'C')).toBe(null);
+    const released = run(emptyPadMemory, 8900, 9000);
+    expect(padChordName(released, 'F')).toBe(null);
   });
 });

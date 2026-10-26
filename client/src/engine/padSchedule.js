@@ -67,3 +67,8 @@ export function padTick(memory, { playing, key, nowMs, lookAheadMs, timelines, f
   const sounding = changes.length > 0 ? Boolean(changes.at(-1).notes) : next.sounding;
   return { memory: { key, scheduledUntilMs: untilMs, sounding }, actions };
 }
+
+export function padChordName({ memory, actions }, shownChord) {
+  const start = memory.sounding ? shownChord : null;
+  return actions.reduce((current, action) => (action.kind === 'chord' ? action.chord : null), start);
+}
