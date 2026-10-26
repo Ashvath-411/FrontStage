@@ -32,9 +32,9 @@ export function pitchClass(pitch) {
 export const learnableActions = ['record', 'stop', 'play', 'undo'];
 const buttonPressFrom = 64;
 
-export function bindingFromMessage(message) {
+export function bindingFromMessage(message, { allowSustain = false } = {}) {
   if (message.kind === 'noteOn') return { type: 'note', channel: message.channel, number: message.note };
-  if (message.kind === 'control' && !isSustainMessage(message) && message.value >= buttonPressFrom) return { type: 'control', channel: message.channel, number: message.controller };
+  if (message.kind === 'control' && (allowSustain || !isSustainMessage(message)) && message.value >= buttonPressFrom) return { type: 'control', channel: message.channel, number: message.controller };
   if (message.kind === 'program') return { type: 'program', channel: message.channel, number: message.program };
   return null;
 }
@@ -46,8 +46,8 @@ function messageMatches(binding, message) {
   return message.kind === 'program' && message.program === binding.number;
 }
 
-export function boundAction(bindings, message) {
-  const action = learnableActions.find((name) => bindings[name] && messageMatches(bindings[name], message));
+export function boundAction(bindings, message, actions = learnableActions) {
+  const action = actions.find((name) => bindings[name] && messageMatches(bindings[name], message));
   if (!action) return null;
   const pressed = message.kind === 'noteOn' || message.kind === 'program' || (message.kind === 'control' && message.value >= buttonPressFrom);
   return { action, pressed };
@@ -60,10 +60,10 @@ export function describeBinding(binding) {
   return `Program ${binding.number + 1} · channel ${binding.channel}`;
 }
 
-export function readBindings(text) {
+export function readBindings(text, actions = learnableActions) {
   try {
     const parsed = JSON.parse(text ?? '{}');
-    return Object.fromEntries(learnableActions.filter((name) => parsed?.[name]?.type).map((name) => [name, parsed[name]]));
+    return Object.fromEntries(actions.filter((name) => parsed?.[name]?.type).map((name) => [name, parsed[name]]));
   } catch {
     return {};
   }

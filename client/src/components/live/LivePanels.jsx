@@ -9,7 +9,7 @@ import { findMe } from '../../sessionRoles.js';
 
 const panelTitles = { menu: 'Menu', view: 'View settings', session: 'Session settings', info: 'Session info', band: 'Band' };
 
-export function LivePanels({ panel, session, prefs, updatePrefs, sound, pad, signedIn, debugOn, onToggleDebug, onOpenPanel, onClose, onLeave, onEnd }) {
+export function LivePanels({ panel, session, prefs, updatePrefs, sound, pad, sessionMidi, signedIn, debugOn, onToggleDebug, onOpenPanel, onClose, onLeave, onEnd }) {
   if (!panel) return null;
   const joinedInstrument = findMe(session)?.instrument ?? '';
   if (panel === 'sound') {
@@ -21,6 +21,7 @@ export function LivePanels({ panel, session, prefs, updatePrefs, sound, pad, sig
         <LiveMenu
           session={session}
           pad={pad}
+          sessionMidi={sessionMidi}
           signedIn={signedIn}
           debugOn={debugOn}
           onOpenPanel={onOpenPanel}

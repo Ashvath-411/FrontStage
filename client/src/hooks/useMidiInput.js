@@ -16,7 +16,7 @@ function accessProblem(problem) {
   return 'error';
 }
 
-export function useMidiInput(onMessage) {
+export function useMidiInput(onMessage, { active = true } = {}) {
   const [status, setStatus] = useState(midiSupported() ? 'idle' : 'unsupported');
   const [devices, setDevices] = useState([]);
   const [deviceId, setDeviceId] = useState(allDevices);
@@ -26,7 +26,7 @@ export function useMidiInput(onMessage) {
 
   useEffect(() => {
     const access = accessRef.current;
-    if (!access || status !== 'ready') return undefined;
+    if (!access || status !== 'ready' || !active) return undefined;
     function attach() {
       setDevices(listInputs(access));
       access.inputs.forEach((input) => {
@@ -44,7 +44,7 @@ export function useMidiInput(onMessage) {
         input.onmidimessage = null;
       });
     };
-  }, [status, deviceId]);
+  }, [status, deviceId, active]);
 
   useEffect(() => {
     navigator.permissions?.query({ name: 'midi' })
